@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "549227841903",
+    "project_id": "news-blog-7a7ef",
+    "storage_bucket": "news-blog-7a7ef.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:549227841903:android:d5b7dbdcdfeac82cc1009a",
+        "android_client_info": {
+          "package_name": "com.example.test_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "549227841903-03kpep2oilncn428bfnk55692rujr87b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQXE_8jTcAv3OWlxDSCGDlYYBelTGQBuI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "549227841903-03kpep2oilncn428bfnk55692rujr87b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:549227841903:android:7f16b1909379f1a5c1009a",
+        "android_client_info": {
+          "package_name": "com.iqonic.news_flutter"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "549227841903-03kpep2oilncn428bfnk55692rujr87b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQXE_8jTcAv3OWlxDSCGDlYYBelTGQBuI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "549227841903-03kpep2oilncn428bfnk55692rujr87b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
