@@ -1,20 +1,23 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pinput/pinput.dart';
-import 'package:test_app/chat/chat_home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_app/chat/chat_username_screen.dart';
 import 'package:test_app/utils.dart';
 import 'package:test_app/widgets/customToast.dart';
 import 'package:test_app/widgets/default_button.dart';
 import 'package:transition_pages_jr/transition_pages_jr.dart';
 
+import 'chat_home_screen.dart';
+
 class ChatOtpScreen extends StatefulWidget {
-  String pin;
+  String phone;
   bool isTimeOut2;
   String verifyId;
-   ChatOtpScreen({Key? key,required this.pin,required this.verifyId,required this.isTimeOut2}) : super(key: key);
+   ChatOtpScreen({Key? key,required this.phone,required this.verifyId,required this.isTimeOut2}) : super(key: key);
 
   @override
   State<ChatOtpScreen> createState() => _ChatOtpScreenState();
@@ -26,6 +29,9 @@ bool verifyText = false;
 bool loading = false;
 bool isTimeOut = false;
 String myVerificationId = "";
+final FirebaseAuth _auth = FirebaseAuth.instance;
+
+
 @override
   void initState() {
     // TODO: implement initState
@@ -33,6 +39,69 @@ String myVerificationId = "";
     myVerificationId = widget.verifyId;
     isTimeOut = widget.isTimeOut2;
   }
+
+void signInWithPhoneAuthCredential(PhoneAuthCredential phoneAuthCredential) async {
+  if(mounted) {
+    setState(() {
+    loading = true;
+  });
+  }
+
+  try {
+    final authCredential = await _auth.signInWithCredential(phoneAuthCredential);
+
+    if(authCredential.user != null){
+      if(mounted){
+        setState(() {
+          verifyText = true;
+        });
+      }
+      ToastUtils.showCustomToast(context, "Verification Success",Colors.green);
+      postDetailsToFirestore(context, widget.phone);
+    }
+
+
+  } on FirebaseAuthException catch (e) {
+    if(mounted) {
+      setState(() {
+      loading = false;
+    });
+    }
+    ToastUtils.showCustomToast(context, e.message.toString(),Colors.red);
+  }
+}
+
+void postDetailsToFirestore(BuildContext context, phone) async {
+  SharedPreferences preferences =await SharedPreferences.getInstance();
+  final _auth = FirebaseAuth.instance;
+  FirebaseFirestore firebaseFirestore = FirebaseFirestore.instance;
+  User? user = _auth.currentUser;
+
+  await firebaseFirestore.collection("users").doc(user!.uid).set({
+    'uid': user.uid,
+    'phone': phone,
+    'username': '',
+  }).then((value) {
+    if(mounted) {
+      setState(() {
+        loading = false;
+      });
+    }
+    preferences.setString("uid", user.uid.toString());
+    preferences.setString("logStatus", "true");
+    RouteTransitions(
+      context: context,
+      child:const ChatUsernameScreen(),
+      animation: AnimationType.fadeIn,
+    );
+  }).catchError((e) {});
+  if(mounted) {
+    setState(() {
+      loading = false;
+    });
+  }
+
+}
 
 @override
   Widget build(BuildContext context) {
@@ -109,42 +178,19 @@ String myVerificationId = "";
                  SizedBox(
                   height: 80.h,
                 ),
-                Center(
+                loading ? Center(
+                  child: CircularProgressIndicator(color: AppColors.darkBlueColor,),
+                ): Center(
                   child: DefaultButton(
-                      onTap:  ()
-                      async {
-                        if(mounted) {
-                          setState(() {
-                            loading = true;
-                          });
-                        }
+                    onTap: (){
 
-                          try{
-                            PhoneAuthCredential credential = PhoneAuthProvider.credential(verificationId: myVerificationId, smsCode: otpController.text);
-                            if(mounted){
-                              setState(() {
-                                verifyText = true;
-                              });
-                            }
-                            // Sign the user in (or link) with the credential
-                            await FirebaseAuth.instance.signInWithCredential(credential);
-                            if(FirebaseAuth.instance.currentUser != null){
-                              Future.delayed(
-                                  const Duration(seconds: 2),
-                                      () =>  Navigator.of(context).push(PageRouteBuilder(pageBuilder: (_,__,___) =>const ChatHome())));
+                      PhoneAuthCredential phoneAuthCredential =
+                      PhoneAuthProvider.credential(
+                          verificationId: myVerificationId, smsCode: otpController.text);
 
-                            }
+                      signInWithPhoneAuthCredential(phoneAuthCredential);
 
-                          }on FirebaseAuthException catch (e){
-                            ToastUtils.showCustomToast(context, e.toString(), AppColors.lightBlueColor);
-                          }
-                          if(mounted) {
-                            setState(() {
-                            loading = false;
-                          });
-                          }
-
-                        },
+                    },
                       text: "VERIFY"),
                 ),
                  SizedBox(
@@ -184,7 +230,7 @@ String myVerificationId = "";
                     });
                     }
                     await FirebaseAuth.instance.verifyPhoneNumber(
-                      phoneNumber: '+9647501233211',
+                      phoneNumber: widget.phone,
                       verificationCompleted: (PhoneAuthCredential credential) {},
                       verificationFailed: (FirebaseAuthException e) {
                         if(mounted) {

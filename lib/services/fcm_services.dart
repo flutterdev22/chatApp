@@ -25,7 +25,7 @@ class FCMServices {
         "to": "/topics/$topic",
         "notification": {
           "title": title,
-          "body": description,
+          "chatUI": description,
         },
         "mutable_content": true,
         "content_available": true,

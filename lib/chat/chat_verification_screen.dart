@@ -175,12 +175,16 @@ class _ChatVerificationScreenState extends State<ChatVerificationScreen> {
                          }
                          RouteTransitions(
                            context: context,
-                           child: ChatOtpScreen(isTimeOut2: false ,pin:countryCode.toString()+phone.text.toString().replaceAll( RegExp(r'^0+(?=.)'), '').toString(),verifyId:verificationId),
+                           child: ChatOtpScreen(isTimeOut2: false ,phone:countryCode.toString()+phone.text.toString().replaceAll(RegExp(r'^0+(?=.)'), '').toString(),verifyId:verificationId),
                            animation: AnimationType.fadeIn,
                          );
                        },
                        codeAutoRetrievalTimeout: (String verificationId) {
-
+                         if(mounted){
+                           setState(() {
+                             loading = false;
+                           });
+                         }
                        },
                      );
                    }

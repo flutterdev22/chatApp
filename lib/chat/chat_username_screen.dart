@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_app/chat/chat_counselor_screen.dart';
 import 'package:test_app/widgets/customToast.dart';
 import 'package:test_app/widgets/default_button.dart';
@@ -17,6 +20,46 @@ class ChatUsernameScreen extends StatefulWidget {
 
 class _ChatUsernameScreenState extends State<ChatUsernameScreen> {
   TextEditingController username = TextEditingController();
+  bool loading = false;
+  final FirebaseFirestore firebaseFirestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  Future updateUName() async{
+    SharedPreferences preferences =await SharedPreferences.getInstance();
+    preferences.setString("username", username.text.toString());
+
+    firebaseFirestore
+        .collection("users")
+        .doc(_auth.currentUser!.uid)
+        .update({
+      "username":username.text.toString(),
+    }).then((data) async {
+        if(mounted) {
+          setState(() {
+          loading = false;
+        });
+        }
+        ToastUtils.showCustomToast(context, "Username Added", AppColors.darkBlueColor);
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ChatCounselorScreen(username:username.text.toString()))
+          );
+        });
+
+      }).catchError((err) {
+      if(mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+      ToastUtils.showCustomToast(context, err.toString(), Colors.red);
+      });
+
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,18 +139,22 @@ class _ChatUsernameScreenState extends State<ChatUsernameScreen> {
                  SizedBox(
                   height: 80.h,
                 ),
-                Center(
+                loading ? Center(
+                  child: CircularProgressIndicator(color: AppColors.darkBlueColor,),
+                ):Center(
                   child: DefaultButton(
                       onTap: () {
                         if(username.text.isEmpty){
                           ToastUtils.showCustomToast(context, "Please Enter Username", AppColors.darkBlueColor);
                         }
                         else{
-                          RouteTransitions(
-                            context: context,
-                            child: ChatCounselorScreen(username:username.text.toString()),
-                            animation: AnimationType.fadeIn,
-                          );
+
+                          if(mounted){
+                            setState(() {
+                              loading = true;
+                            });
+                          }
+                       updateUName();
                         }
 
 

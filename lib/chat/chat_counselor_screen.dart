@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:test_app/chat/chat_home_screen.dart';
 import 'package:test_app/utils.dart';
 import 'package:test_app/widgets/default_button.dart';
+import 'package:transition_pages_jr/transition_pages_jr.dart';
+
+import 'chat_profile_screen.dart';
 
 class ChatCounselorScreen extends StatefulWidget {
   String username;
@@ -88,7 +92,13 @@ class _ChatCounselorScreenState extends State<ChatCounselorScreen> {
                   height: 80.h,
                 ),
                 Center(
-                  child: DefaultButton(onTap: () {}, text: "ASK A COUNSELOR"),
+                  child: DefaultButton(onTap: () {
+                    RouteTransitions(
+                      context: context,
+                      child:  const ChatHome(),
+                      animation: AnimationType.fadeIn,
+                    );
+                  }, text: "ASK A COUNSELOR"),
                 ),
               ],
             ),

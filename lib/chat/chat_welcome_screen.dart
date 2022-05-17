@@ -1,13 +1,67 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_app/widgets/default_button.dart';
 import 'package:transition_pages_jr/transition_pages_jr.dart';
 
+import '../utils.dart';
+import 'chat_counselor_screen.dart';
 import 'chat_verification_screen.dart';
 
-class ChatWelcomeScreen extends StatelessWidget {
+class ChatWelcomeScreen extends StatefulWidget {
   const ChatWelcomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ChatWelcomeScreen> createState() => _ChatWelcomeScreenState();
+}
+
+class _ChatWelcomeScreenState extends State<ChatWelcomeScreen> {
+
+
+  var logStatus,uname;
+  bool loading = false;
+  getUser() async{
+    SharedPreferences preferences =await SharedPreferences.getInstance();
+    if(mounted){
+      setState(() {
+        logStatus = preferences.getString("logStatus");
+        uname = preferences.getString("username");
+
+      });
+
+    }
+    log(logStatus.toString());
+    log(uname.toString());
+
+    if(logStatus.toString() != "null" && uname.toString().isNotEmpty){
+      if(mounted){
+        setState(() {
+          loading = false;
+        });
+      }
+      RouteTransitions(
+        context: context,
+        child:  ChatCounselorScreen(username:uname.toString()),
+        animation: AnimationType.fadeIn,
+      );
+    }
+    else{
+      if(mounted){
+        setState(() {
+          loading = false;
+        });
+      }
+      RouteTransitions(
+        context: context,
+        child: const ChatVerificationScreen(),
+        animation: AnimationType.fadeIn,
+      );
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -36,13 +90,16 @@ class ChatWelcomeScreen extends StatelessWidget {
                    SizedBox(height: 40.h,),
                   Text("Get Godly Advise, Chat anonymously",style: GoogleFonts.rubik(fontWeight: FontWeight.w300,fontSize: 16.sp,color: const Color(0xFF12558A)),),
                   const Spacer(flex: 2,),
-                  Center(
+                  loading ? Center(
+                    child: CircularProgressIndicator(color: AppColors.darkBlueColor,),
+                  ):Center(
                     child: DefaultButton(onTap: (){
-                      RouteTransitions(
-                        context: context,
-                        child: const ChatVerificationScreen(),
-                        animation: AnimationType.fadeIn,
-                      );
+                      if(mounted){
+                        setState(() {
+                          loading = true;
+                        });
+                      }
+                      getUser();
 
                     }, text: "Start Chat"),
                   ),
