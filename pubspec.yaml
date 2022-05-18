@@ -48,6 +48,12 @@ dependencies:
   flutter_local_notifications: ^9.5.3+1
   firebase_core: ^1.17.0
   feather_icons: ^1.2.0
+  uuid: ^3.0.5
+  intl: ^0.17.0
+  image_picker: ^0.8.5+3
+  audioplayers: ^0.20.1
+  record_mp3: ^3.0.0
+  permission_handler: ^9.2.0
 
 dev_dependencies:
   flutter_test:

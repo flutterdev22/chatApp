@@ -1,11 +1,16 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:test_app/chat/chat_home_screen.dart';
+import 'package:test_app/completeChat/chat_handler.dart';
 import 'package:test_app/utils.dart';
 import 'package:test_app/widgets/default_button.dart';
 import 'package:transition_pages_jr/transition_pages_jr.dart';
 
+import '../completeChat/chat_room.dart';
+import '../completeChat/model/chat_room_model.dart';
+import '../completeChat/model/user_model.dart';
 import 'chat_profile_screen.dart';
 
 class ChatCounselorScreen extends StatefulWidget {
@@ -92,12 +97,36 @@ class _ChatCounselorScreenState extends State<ChatCounselorScreen> {
                   height: 80.h,
                 ),
                 Center(
-                  child: DefaultButton(onTap: () {
-                    RouteTransitions(
-                      context: context,
-                      child:  const ChatHome(),
-                      animation: AnimationType.fadeIn,
-                    );
+                  child: DefaultButton(onTap: () async{
+                    ChatRoomModel? chatRoomModel =
+                        await chatHandler.getChatRoom(
+                        "co718RpeRmKCM2fvjhXx",
+                        FirebaseAuth.instance
+                            .currentUser!.uid);
+
+                    if (chatRoomModel != null) {
+
+                      RouteTransitions(
+                        context: context,
+                        child: ChatRoom(
+                          targetUser: UserModel(
+                            uid: "co718RpeRmKCM2fvjhXx",
+                            fullname: "Admin",
+                            email: 'admin@gmail.com',
+                            profilepic: "",
+                          ),
+                          userModel: UserModel(
+                            uid: FirebaseAuth.instance.currentUser!.uid,
+                            fullname: widget.username,
+                            email: "+923234591996",
+                            profilepic: "",
+                          ),
+                          chatRoom: chatRoomModel,
+                        ),
+                        animation: AnimationType.fadeIn,
+                      );
+                    }
+
                   }, text: "ASK A COUNSELOR"),
                 ),
               ],
