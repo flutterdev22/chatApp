@@ -54,6 +54,7 @@ dependencies:
   audioplayers: ^0.20.1
   record_mp3: ^3.0.0
   permission_handler: ^9.2.0
+  photo_view: ^0.13.0
 
 dev_dependencies:
   flutter_test:

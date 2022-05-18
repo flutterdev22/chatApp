@@ -9,7 +9,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:test_app/utils.dart';
+import 'package:test_app/widgets/customToast.dart';
 import 'package:uuid/uuid.dart';
+import 'fullPagePhoto.dart';
 import 'model/chat_room_model.dart';
 import 'model/message_model.dart';
 import 'model/user_model.dart';
@@ -37,16 +39,19 @@ class _ChatRoomState extends State<ChatRoom> {
   var uuid = Uuid();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseStorage storage = FirebaseStorage.instance;
   final FocusNode focusNode = FocusNode();
   bool isShowSticker = false;
+
 
   @override
   void initState() {
     super.initState();
     focusNode.addListener(onFocusChange);
   }
-
+  bool isLoading = false;
   File? imageFile;
+  String imageUrl = "";
 
   Future getImage() async {
     ImagePicker _picker = ImagePicker();
@@ -60,47 +65,31 @@ class _ChatRoomState extends State<ChatRoom> {
   }
 
   Future uploadImage() async {
-    String fileName = Uuid().v1();
-    int status = 1;
-
-    await _firestore
-        .collection('groups')
-        .doc("")
-        .collection('chats')
-        .doc(fileName)
-        .set({
-      "SendBy": _auth.currentUser!.displayName,
-      "message": "",
-      "type": "img",
-      "time": FieldValue.serverTimestamp(),
-    });
-
-    var ref =
-    FirebaseStorage.instance.ref().child('images').child("$fileName.jpg");
-
-    var uploadTask = await ref.putFile(imageFile!).catchError((error) async {
-      await _firestore
-          .collection('groups')
-          .doc("")
-          .collection('chats')
-          .doc(fileName)
-          .delete();
-
-      status = 0;
-    });
-
-    if (status == 1) {
-      String imageUrl = await uploadTask.ref.getDownloadURL();
-
-      await _firestore
-          .collection('groups')
-          .doc("")
-          .collection('chats')
-          .doc(fileName)
-          .update({"message": imageUrl});
-
-
+    String fileName = DateTime.now().millisecondsSinceEpoch.toString();
+    UploadTask uploadTask = uploadFile(imageFile!, fileName);
+    try {
+      TaskSnapshot snapshot = await uploadTask;
+      imageUrl = await snapshot.ref.getDownloadURL();
+      if(mounted) {
+        setState(() {
+        isLoading = false;
+        sendMsg("image",imageUrl);
+      });
+      }
+    } on FirebaseException catch (e) {
+      if(mounted) {
+        setState(() {
+        isLoading = false;
+      });
+      }
+      ToastUtils.showCustomToast(context, e.message ?? e.toString(), AppColors.darkBlueColor);
     }
+
+  }
+  UploadTask uploadFile(File image, String fileName) {
+    Reference reference = storage.ref().child(fileName);
+    UploadTask uploadTask = reference.putFile(image);
+    return uploadTask;
   }
 
   sendMsg(String mType,String mText) async {
@@ -109,7 +98,7 @@ class _ChatRoomState extends State<ChatRoom> {
       sender: widget.userModel.uid.toString(),
       text: mText,
       seen: false,
-      type:mType,
+      type: mType,
       createdon: DateTime.now(),
     );
 
@@ -281,7 +270,87 @@ class _ChatRoomState extends State<ChatRoom> {
                                 )
                                     : currentMessage.type == "image"
                                  // Image
-                                    ? SizedBox.shrink()
+                                    ? isLoading? CircularProgressIndicator(color: AppColors.darkBlueColor,): Row(
+                                      mainAxisAlignment: (currentMessage.sender ==
+                                      widget.userModel.uid)
+                                      ? MainAxisAlignment.end
+                                      : MainAxisAlignment.start,
+                                      children: [
+                                        Column(
+                                         crossAxisAlignment: (currentMessage.sender ==
+                                          widget.userModel.uid)
+                                          ? CrossAxisAlignment.end
+                                          : CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              child: OutlinedButton(
+                                            child: Material(
+                                              child: Image.network(
+                                                currentMessage.text!,
+                                                loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                                  if (loadingProgress == null) return child;
+                                                  return Container(
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.blackColor,
+                                                      borderRadius: BorderRadius.all(
+                                                        Radius.circular(8),
+                                                      ),
+                                                    ),
+                                                    width: 200,
+                                                    height: 200,
+                                                    child: Center(
+                                                      child: CircularProgressIndicator(
+                                                        color: AppColors.darkBlueColor,
+                                                        value: loadingProgress.expectedTotalBytes != null
+                                                            ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                            : null,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                errorBuilder: (context, object, stackTrace) {
+                                                  return Material(
+                                                    child: Image.asset(
+                                                      'images/img_not_available.jpeg',
+                                                      width: 200,
+                                                      height: 200,
+                                                      fit: BoxFit.cover,
+                                                    ),
+                                                    borderRadius: BorderRadius.all(
+                                                      Radius.circular(8),
+                                                    ),
+                                                    clipBehavior: Clip.hardEdge,
+                                                  );
+                                                },
+                                                width: 200,
+                                                height: 200,
+                                                fit: BoxFit.cover,
+                                              ),
+                                              borderRadius: BorderRadius.all(Radius.circular(8)),
+                                              clipBehavior: Clip.hardEdge,
+                                            ),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => FullPhotoPage(
+                                                    url: currentMessage.text!,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            style: ButtonStyle(padding: MaterialStateProperty.all<EdgeInsets>(EdgeInsets.all(0))),
+                                  ),
+                                  margin: EdgeInsets.only(bottom:  10, right: 10),
+                                ),
+                                            Text(DateFormat.jm().format(currentMessage.createdon!), style: GoogleFonts.rubik(
+                                              fontSize: 10.sp,
+                                              color: AppColors.lightBlackColor,
+                                            ),),
+                                          ],
+                                        ),
+                                      ],
+                                    )
                                 // Sticker
                                     : Row(
                                   mainAxisAlignment: (currentMessage.sender ==
@@ -376,7 +445,11 @@ class _ChatRoomState extends State<ChatRoom> {
                             ),
                           ),
                         )),
-                        Icon(FeatherIcons.share,color: AppColors.lightBlackColor,),
+                        IconButton(
+                          icon: Icon(FeatherIcons.share),
+                          onPressed: getImage,
+                          color: AppColors.lightBlackColor,
+                        ),
                         Container(
                           width: 40.w,
                           height: 40.h,
@@ -414,7 +487,6 @@ class _ChatRoomState extends State<ChatRoom> {
 
     );
   }
-
 
   Widget buildSticker() {
     return Expanded(
