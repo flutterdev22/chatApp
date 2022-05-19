@@ -11,13 +11,7 @@ class FullPhotoPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          "FULL PHOTO",
-          style: GoogleFonts.rubik(color: AppColors.darkBlueColor),
-        ),
-        centerTitle: true,
-      ),
+      appBar: null,
       body: PhotoView(
         imageProvider: NetworkImage(url),
       ),
