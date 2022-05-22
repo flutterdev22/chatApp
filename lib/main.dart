@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -8,9 +9,12 @@ import 'package:test_app/chat/chat_welcome_screen.dart';
 import 'package:test_app/services/fcm_services.dart';
 import 'package:test_app/services/local_notifications.dart';
 
+import 'globals.dart';
+
 Future<void> main() async{
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await Globals.init();
   await LocalNotificationsService.instance.initialize();
   FirebaseMessaging.onBackgroundMessage(_messageHandler);
   FCMServices.fcmGetTokenandSubscribe('chat');

@@ -1,4 +1,5 @@
 import 'package:country_code_picker/country_code_picker.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -21,6 +22,7 @@ class _ChatVerificationScreenState extends State<ChatVerificationScreen> {
   CountryCode countryCode = CountryCode.fromDialCode('+92');
   bool loading = false;
   TextEditingController phone = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

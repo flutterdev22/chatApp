@@ -1,6 +1,4 @@
 // ignore_for_file: avoid_unnecessary_containers, prefer_const_constructors
-import 'dart:developer';
-
 import 'package:back_button_interceptor/back_button_interceptor.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:emoji_keyboard_flutter/emoji_keyboard_flutter.dart';
@@ -18,7 +16,7 @@ import 'package:record/record.dart';
 import 'package:test_app/utils.dart';
 import 'package:test_app/widgets/customToast.dart';
 import 'package:uuid/uuid.dart';
-import '../widgets/loadingView.dart';
+import 'package:video_player/video_player.dart';
 import 'fullPagePhoto.dart';
 import 'model/chat_room_model.dart';
 import 'model/message_model.dart';
@@ -45,8 +43,8 @@ class ChatRoom extends StatefulWidget {
   State<ChatRoom> createState() => _ChatRoomState();
 }
 
-class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin{
-  late AnimationController controller;
+class _ChatRoomState extends State<ChatRoom> with WidgetsBindingObserver{
+  double progress = 0.0;
 
   TextEditingController masgContrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -57,29 +55,48 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
   final FocusNode focusNode = FocusNode();
   bool isShowSticker = false;
 
+
   @override
   void initState() {
     super.initState();
-    controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
     BackButtonInterceptor.add(myInterceptor);
-
   }
+
 
   @override
   void dispose() {
-    controller.dispose();
     BackButtonInterceptor.remove(myInterceptor);
     super.dispose();
   }
 
+  ImagePicker picker = ImagePicker();
   bool isLoading = false;
+  bool isLoadingVideo = false;
   File? imageFile;
   String imageUrl = "";
+  String videoUrl = "";
+
+  PlatformFile? file;
+  UploadTask? uploadTask;
+
+  Future selectFile() async{
+    Navigator.pop(context);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['mp4','mov','.avi'],
+    );
+    if(result == null) return;
+    if(mounted) {
+      setState(() {
+        isLoading = true;
+      file = result.files.first;
+    });
+    }
+    uploadVideoFile();
+  }
 
   Future getImage() async {
+    Navigator.pop(context);
     ImagePicker _picker = ImagePicker();
 
     await _picker.pickImage(source: ImageSource.gallery).then((xFile) {
@@ -95,33 +112,81 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
     });
   }
 
+  Future getCameraImage() async {
+    Navigator.pop(context);
+    ImagePicker _picker = ImagePicker();
+
+    await _picker.pickImage(source: ImageSource.camera).then((xFile) {
+      if (xFile != null) {
+        imageFile = File(xFile.path);
+        if(mounted){
+          setState(() {
+            isLoading = true;
+          });
+        }
+        uploadImage();
+      }
+    });
+  }
+
+  Future uploadVideoFile() async{
+    final path = 'videoFiles/${file!.name}';
+    final fle = File(file!.path!);
+    final ref = FirebaseStorage.instance.ref().child(path);
+    if(mounted) {
+      setState(() {
+      uploadTask =ref.putFile(fle);
+    });
+    }
+    try{
+      final snap = await uploadTask!.whenComplete(() => {});
+      videoUrl = await snap.ref.getDownloadURL();
+      if(mounted) {
+        setState(() {
+          isLoading =false;
+          uploadTask =null;
+          sendMsg("video",videoUrl);
+        });
+      }
+    }on FirebaseException catch (e) {
+      if(mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+      ToastUtils.showCustomToast(context, e.message ?? e.toString(), AppColors.darkBlueColor);
+    }
+  }
+
   Future uploadImage() async {
     String fileName = DateTime.now().millisecondsSinceEpoch.toString();
-    UploadTask uploadTask = uploadFile(imageFile!, fileName);
-    try {
-      TaskSnapshot snapshot = await uploadTask;
-      imageUrl = await snapshot.ref.getDownloadURL();
+    final path = 'imageFiles/$fileName';
+    final fle = File(imageFile!.path);
+    final ref = FirebaseStorage.instance.ref().child(path);
+    if(mounted) {
+      setState(() {
+        uploadTask =ref.putFile(fle);
+      });
+    }
+    try{
+      final snap = await uploadTask!.whenComplete(() => {});
+      imageUrl = await snap.ref.getDownloadURL();
       if(mounted) {
         setState(() {
-        isLoading = false;
-        sendMsg("image",imageUrl);
-      });
+          isLoading =false;
+          uploadTask =null;
+          sendMsg("image",imageUrl);
+        });
       }
-    } on FirebaseException catch (e) {
+    }on FirebaseException catch (e) {
       if(mounted) {
         setState(() {
-        isLoading = false;
-      });
+          isLoading = false;
+        });
       }
       ToastUtils.showCustomToast(context, e.message ?? e.toString(), AppColors.darkBlueColor);
     }
 
-  }
-
-  UploadTask uploadFile(File image, String fileName) {
-    Reference reference = storage.ref().child(fileName);
-    UploadTask uploadTask = reference.putFile(image);
-    return uploadTask;
   }
 
   sendMsg(String mType,String mText) async {
@@ -150,8 +215,6 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
 
     masgContrl.clear();
   }
-
-
 
   void getSticker() {
     // Hide keyboard when sticker appear
@@ -188,7 +251,7 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
       appBar: AppBar(
         leading: GestureDetector(
           onTap: (){
-            Navigator.pop(context);
+           Navigator.pop(context);
           },
           child: Icon(FeatherIcons.chevronLeft,color: Colors.white,),
         ),
@@ -251,10 +314,45 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
       ),
       body:Form(
         key: _formKey,
-        child: Column(
+        child: isLoading ?
+        Center(
+          child: StreamBuilder<TaskSnapshot>(
+              stream: uploadTask?.snapshotEvents,
+              builder: (context, snapshot){
+                if(snapshot.hasData){
+                  final data = snapshot.data;
+                  double progress = (data!.bytesTransferred / data.totalBytes);
+                  return SizedBox(
+                    width: 100.w,
+                    height: 100.h,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CircularProgressIndicator(
+                            value: progress,
+                            color: AppColors.darkBlueColor,
+                            backgroundColor: Colors.grey
+                        ),
+
+                        Center(
+                          child: Text('${(100 * progress).roundToDouble()} %',style: GoogleFonts.rubik(
+                              fontWeight: FontWeight.bold,fontSize: 20.sp
+                          ),
+                          ),
+                        )
+                      ],
+                    ),
+                  );
+                }
+                else{
+                  return SizedBox();
+                }
+              }),
+        )
+        :Column(
           children: [
             SizedBox(height: 10.h,),
-            isLoading ? Expanded(child: LoadingView()):  Expanded(
+            Expanded(
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 10),
                 child: StreamBuilder  (
@@ -267,19 +365,16 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.active) {
                       if (snapshot.hasData) {
-                        QuerySnapshot dataSnapshot =
-                        snapshot.data as QuerySnapshot;
+                        QuerySnapshot dataSnapshot = snapshot.data as QuerySnapshot;
 
                         return ListView.builder(
                           reverse: true,
                           itemCount: dataSnapshot.docs.length,
                           itemBuilder: (context, index) {
-                            MessageModel currentMessage =
-                            MessageModel.fromMap(dataSnapshot.docs[index]
-                                .data() as Map<String, dynamic>);
+                            MessageModel currentMessage = MessageModel.fromMap(dataSnapshot.docs[index].data() as Map<String, dynamic>);
 
                             return currentMessage.type == "text"
-                            // Text
+                                // Text
                                 ?  Row(
                               mainAxisAlignment: (currentMessage.sender ==
                                   widget.userModel.uid)
@@ -356,7 +451,7 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                               ],
                             )
                                 : currentMessage.type == "image"
-                            // Image
+                                 // Image
                                 ? Row(
                               mainAxisAlignment: (currentMessage.sender ==
                                   widget.userModel.uid)
@@ -372,7 +467,8 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                                     Container(
                                       child: OutlinedButton(
                                         child: Material(
-                                          child: Image.network(
+                                          child:currentMessage.text != ""?
+                                          Image.network(
                                             currentMessage.text!,
                                             loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
                                               if (loadingProgress == null) return child;
@@ -412,11 +508,38 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                                             width: 200.w,
                                             height: 200.h,
                                             fit: BoxFit.cover,
-                                          ),
+                                          )
+                                          :StreamBuilder<TaskSnapshot>(
+                                              stream: uploadTask?.snapshotEvents,
+                                              builder: (context, snapshot){
+                                                if(snapshot.hasData){
+                                                  final data = snapshot.data;
+                                                  double progress = (data!.bytesTransferred / data.totalBytes);
+
+                                                  return SizedBox(
+                                                    height: 50,
+                                                    child: Stack(
+                                                      fit: StackFit.expand,
+                                                      children: [
+                                                        LinearProgressIndicator(value: progress,
+                                                          color: Colors.green,backgroundColor: Colors.grey,),
+                                                        Center(
+                                                          child: Text('${(100 * progress).roundToDouble()} %'
+                                                          ),
+                                                        )
+                                                      ],
+                                                    ),
+                                                  );
+                                                }
+                                                else{
+                                                  return SizedBox();
+                                                }
+                                              }),
                                           borderRadius: BorderRadius.all(Radius.circular(8)),
                                           clipBehavior: Clip.hardEdge,
                                         ),
                                         onPressed: () {
+                                          FocusScope.of(context).unfocus();
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
@@ -425,6 +548,7 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                                               ),
                                             ),
                                           );
+
                                         },
                                         style: ButtonStyle(padding: MaterialStateProperty.all<EdgeInsets>(EdgeInsets.all(0))),
                                       ),
@@ -440,11 +564,12 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                                 ),
                               ],
                             )
-                            // Audio
-                                :currentMessage.type == "audio"?
-                                Padding(
+                                 // Audio
+                                 :currentMessage.type == "audio"
+                                 ? Padding(
                               padding: EdgeInsets.only(
                                   top: 8,
+                                  bottom: 10,
                                   left: (currentMessage.sender == widget.userModel.uid? 64 : 10),
                                   right: (currentMessage.sender == widget.userModel.uid? 10 : 64)),
                               child: Container(
@@ -452,8 +577,8 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                                 padding: EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: currentMessage.sender == widget.userModel.uid
-                                      ? Colors.greenAccent
-                                      : Colors.orangeAccent,
+                                      ? AppColors.blueColor
+                                      : AppColors.lBlueColor,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: GestureDetector(
@@ -469,22 +594,31 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                                       children: [
                                         Row(
                                           children: [
-                                            Icon(isPlayingMsg ? Icons.cancel : Icons.play_arrow),
-                                            Text(
-                                              'Audio',
-                                              maxLines: 10,
-                                            ),
+                                            Container(
+                                                width: 40.w,
+                                                height: 40.h,
+                                                margin: EdgeInsets.symmetric(
+                                                  horizontal: 5,
+                                                  vertical: 0,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                    color: AppColors.darkBlueColor2,
+                                                    shape: BoxShape.circle
+                                                ),
+                                                child: Icon(isPlayingMsg == true? FeatherIcons.pause : FeatherIcons.play,color: Colors.white,)),
+
                                           ],
                                         ),
                                         Text(
-                                            DateFormat.jm().format(currentMessage.createdon!),
+                                          DateFormat.jm().format(currentMessage.createdon!),
                                           style: TextStyle(fontSize: 10),
-                                        )
+                                        ),
+
                                       ],
                                     )),
                               ),
-                            ):
-                                SizedBox.shrink();
+                            )
+                                 : SizedBox.shrink();
                           },
                         );
                       } else if (snapshot.hasError) {
@@ -498,9 +632,7 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                         );
                       }
                     } else {
-                      return Center(
-                        child: CircularProgressIndicator(),
-                      );
+                      return Center();
                     }
                   },
                 ),
@@ -517,15 +649,15 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                 child: Row(
                   children: [
                     Container(
-                        height: 40,
+                        height: 40.h,
                         margin: EdgeInsets.fromLTRB(5, 5, 10, 5),
                         decoration: BoxDecoration(boxShadow: [
                           BoxShadow(
                               color: isRecording
                                   ? Colors.white
                                   : Colors.black12,
-                              spreadRadius: 4)
-                        ], color: Colors.pink, shape: BoxShape.circle),
+                              spreadRadius: 4.r)
+                        ], color: AppColors.darkBlueColor, shape: BoxShape.circle),
                         child: GestureDetector(
                           onLongPress: () {
                             startRecord();
@@ -548,10 +680,9 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                               child: Icon(
                                 Icons.mic,
                                 color: Colors.white,
-                                size: 20,
+                                size: 20.sp,
                               )),
                         )),
-                    //Icon(FeatherIcons.mic,color: AppColors.lgColor,),
                     IconButton(
                       icon: Icon(Icons.face),
                       onPressed: getSticker,
@@ -584,12 +715,15 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
                           ),
                         )),
                     IconButton(
-                      icon: Icon(FeatherIcons.image),
-                      onPressed: (){
-
-                        getImage();
+                      icon: Icon(Icons.attach_file),
+                      onPressed: () {
+                        FocusScope.of(context).unfocus();
+                        showModalBottomSheet(
+                            backgroundColor:
+                            Colors.transparent,
+                            context: context,
+                            builder: (builder) => bottomSheet());
                       },
-                      color: AppColors.lgColor,
                     ),
                     Container(
                       width: 40.w,
@@ -632,20 +766,6 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget buildLoading() {
-    return Positioned(
-      child: isLoading ? LoadingView() : SizedBox.shrink(),
-    );
-  }
-
-  showFilePicker(FileType fileType) async {
-    FilePickerResult? file = await FilePicker.platform.pickFiles(
-      type: fileType,
-      allowedExtensions: ['jpg', 'pdf', 'doc', 'mp4','mov'],
-    );
-    Navigator.pop(context);
-   ToastUtils.showCustomToast(context, "Sending attachment..", AppColors.darkBlueColor);
-  }
 
   bool emojiShowing = false;
 
@@ -748,7 +868,7 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
   String recordFilePath ="";
 
   Future<void> play() async {
-    if (recordFilePath != null && File(recordFilePath).existsSync()) {
+    if (File(recordFilePath).existsSync()) {
       AudioPlayer audioPlayer = AudioPlayer();
       await audioPlayer.play(
         recordFilePath,
@@ -771,7 +891,7 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
 
   uploadAudio() {
     final FirebaseStorage firebaseStorageRef = FirebaseStorage.instance;
-    Reference ref = storage.ref().child('user/audio${DateTime.now().millisecondsSinceEpoch.toString()}}.jpg');
+    Reference ref = storage.ref().child('audioFiles/${DateTime.now().millisecondsSinceEpoch.toString()}}.mp3');
     UploadTask uploadTask = ref.putFile(File(recordFilePath));
     uploadTask.then((res) async{
       var audioURL = await res.ref.getDownloadURL();
@@ -779,6 +899,62 @@ class _ChatRoomState extends State<ChatRoom> with SingleTickerProviderStateMixin
       await sendMsg("audio", strVal);
     });
 
+  }
+
+  Widget bottomSheet() {
+    return SizedBox(
+      height: 180.h,
+      width: MediaQuery.of(context).size.width,
+      child: Card(
+        margin: const EdgeInsets.all(18.0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.r)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              iconCreation(FeatherIcons.video, Colors.blueAccent, "Video",selectFile),
+              SizedBox(
+                width: 40.w,
+              ),
+              iconCreation(FeatherIcons.image, Colors.purple, "Image",getImage),
+              SizedBox(
+                width: 40.w,
+              ),
+              iconCreation(FeatherIcons.camera, Colors.pink, "Camera",getCameraImage),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  Widget iconCreation(IconData icons, Color color, String text,GestureTapCallback tap) {
+    return InkWell(
+      onTap: tap,
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 30.r,
+            backgroundColor: color,
+            child: Icon(
+              icons,
+              size: 29.sp,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(
+            height: 5.h,
+          ),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12.sp,
+              // fontWeight: FontWeight.w100,
+            ),
+          )
+        ],
+      ),
+    );
   }
   
 

@@ -1,12 +1,18 @@
+
 import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import '../utils.dart';
 import '../widgets/default_button.dart';
-class ChatProfilePage extends StatelessWidget {
+class ChatProfilePage extends StatefulWidget {
   const ChatProfilePage({Key? key}) : super(key: key);
+
+  @override
+  State<ChatProfilePage> createState() => _ChatProfilePageState();
+}
+
+class _ChatProfilePageState extends State<ChatProfilePage> {
 
   @override
   Widget build(BuildContext context) {

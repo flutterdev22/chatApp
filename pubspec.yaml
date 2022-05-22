@@ -59,6 +59,8 @@ dependencies:
   path_provider: ^2.0.10
   record: ^4.1.1
   audioplayers: ^0.20.1
+  video_player: ^2.4.2
+  audio_waveforms: ^0.1.1
 
 
 

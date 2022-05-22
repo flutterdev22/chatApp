@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:test_app/utils.dart';
+
 
 class FullPhotoPage extends StatelessWidget {
   final String url;
